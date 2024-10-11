@@ -1,0 +1,237 @@
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "mysql"
+    url      = env("DATABASE_URL")
+}
+
+enum User_type {
+    CONTENT_CREATOR
+    USER
+    ADMIN
+}
+
+model users {
+    id                     String                 @id @default(uuid())
+    email                  String?                @unique @db.VarChar(255)
+    phone                  String?                @unique @db.VarChar(255)
+    social_account_token   String?                @db.VarChar(255)
+    is_email_verified      Boolean                @default(false)
+    is_phone_verified      Boolean                @default(false)
+    is_completed           Boolean                @default(false)
+    is_subscribed          Boolean                @default(false)
+    is_blocked             Boolean?               @default(false)
+    user_type              User_type?
+    created_at             DateTime               @default(now()) @db.Timestamp(0)
+    updated_at             DateTime               @updatedAt
+    user_secrets           user_secrets?
+    user_details           user_details?
+    user_sessions          user_sessions[]
+    notification_receivers notifications[]        @relation("notification_receivers")
+    notification_senders   notifications[]        @relation("notification_senders")
+    chat_users             chat_users[]
+    chat_messages          chat_messages[]
+    chat_message_details   chat_message_details[]
+    help_and_feedback      help_and_feedback[]
+    user_tools             user_tools[]
+    user_experties         user_experties[]
+}
+
+model user_secrets {
+    id                String   @id @default(uuid())
+    user_id           String   @unique
+    stripe_account_id String?
+    otp               String?  @db.VarChar(255)
+    password          String?  @db.VarChar(255)
+    otp_expiration    DateTime @db.DateTime()
+    created_at        DateTime @default(now()) @db.Timestamp(0)
+    updated_at        DateTime @updatedAt
+    users             users?   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model user_sessions {
+    id            String   @id @default(uuid())
+    user_id       String
+    refresh_token String   @db.VarChar(255)
+    fcm_token     String?  @db.LongText
+    created_at    DateTime @default(now()) @db.Timestamp(0)
+    updated_at    DateTime @updatedAt
+    users         users?   @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "FK_USER_SESSION_ID")
+}
+
+model user_details {
+    id                      String                 @id @default(uuid())
+    user_id                 String                 @unique
+    description             String?                @db.VarChar(255)
+    business_name           String?                @db.VarChar(255)
+    first_name              String?                @db.VarChar(255)
+    last_name               String?                @db.VarChar(255)
+    content_creator_type_id String?                @db.VarChar(255)
+    delivery_format         String?                @db.LongText
+    address                 String?                @db.LongText
+    gender                  String?                @db.VarChar(255)
+    date_of_birth           DateTime?              @db.DateTime()
+    contact_phone           String?                @db.VarChar(255)
+    contact_email           String?                @db.VarChar(255)
+    city                    String?                @db.VarChar(255)
+    state                   String?                @db.VarChar(255)
+    country                 String?                @db.VarChar(255)
+    profile_picture         String?                @db.VarChar(255)
+    postal_code             String?                @db.VarChar(255)
+    is_notification         Boolean?               @default(true)
+    is_available            Boolean?               @default(true)
+    created_at              DateTime               @default(now()) @db.Timestamp(0)
+    updated_at              DateTime               @updatedAt
+    users                   users?                 @relation(fields: [user_id], references: [id], onDelete: Cascade)
+    content_creator_types   content_creator_types? @relation(fields: [content_creator_type_id], references: [id])
+}
+
+model user_tools {
+    id         String   @id @default(uuid())
+    tool_name  String   @db.VarChar(255)
+    user_id    String   @db.VarChar(255)
+    created_at DateTime @default(now()) @db.Timestamp(0)
+    updated_at DateTime @updatedAt
+    users      users?   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model user_experties {
+    id           String   @id @default(uuid())
+    experty_name String   @db.VarChar(255)
+    user_id      String   @db.VarChar(255)
+    created_at   DateTime @default(now()) @db.Timestamp(0)
+    updated_at   DateTime @updatedAt
+    users        users?   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model content_creator_types {
+    id           String         @id @default(uuid())
+    name         String         @db.LongText
+    created_at   DateTime       @default(now()) @db.Timestamp(0)
+    updated_at   DateTime       @updatedAt
+    user_details user_details[]
+}
+
+model terms_and_conditions {
+    id         String   @id @default(uuid())
+    data       String?  @db.LongText
+    created_at DateTime @default(now()) @db.Timestamp(0)
+    updated_at DateTime @updatedAt
+}
+
+model privacy_policy {
+    id         String   @id @default(uuid())
+    data       String?  @db.LongText
+    created_at DateTime @default(now()) @db.Timestamp(0)
+    updated_at DateTime @updatedAt
+}
+
+model about_app {
+    id         String   @id @default(uuid())
+    data       String?  @db.LongText
+    created_at DateTime @default(now()) @db.Timestamp(0)
+    updated_at DateTime @updatedAt
+}
+
+model help_and_feedback {
+    id                       String                     @id @default(uuid())
+    user_id                  String
+    content                  String?                    @db.LongText
+    subject                  String?                    @db.VarChar(255)
+    created_at               DateTime                   @default(now()) @db.Timestamp(0)
+    updated_at               DateTime                   @updatedAt
+    users                    users?                     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+    help_and_feedback_images help_and_feedback_images[]
+}
+
+model help_and_feedback_images {
+    id                   String             @id @default(uuid())
+    help_and_feedback_id String
+    image_url            String
+    created_at           DateTime           @default(now()) @db.Timestamp(0)
+    updated_at           DateTime           @updatedAt
+    help_and_feedback    help_and_feedback? @relation(fields: [help_and_feedback_id], references: [id], onDelete: Cascade)
+}
+
+model notifications {
+    id                     Int      @id @default(autoincrement())
+    title                  String?  @db.VarChar(255)
+    message                String?  @db.LongText
+    recipient_id           String
+    sender_id              String
+    metadata               String?  @db.VarChar(255)
+    is_read                Boolean  @default(false)
+    is_admin               Boolean  @default(false)
+    createdAt              DateTime @default(now()) @db.Timestamp(0)
+    updatedAt              DateTime @updatedAt
+    notification_receivers users?   @relation(fields: [recipient_id], name: "notification_receivers", references: [id], onDelete: Cascade)
+    notification_senders   users?   @relation(fields: [sender_id], name: "notification_senders", references: [id], onDelete: Cascade)
+}
+
+model chats {
+    id                   Int                    @id @default(autoincrement())
+    chat_name            String?
+    chat_icon            String?
+    is_group             Boolean                @default(false)
+    created_at           DateTime               @default(now()) @db.Timestamp(0)
+    updated_at           DateTime               @updatedAt
+    chat_users           chat_users[]
+    chat_messages        chat_messages[]
+    chat_message_details chat_message_details[]
+}
+
+enum Mute_duration {
+    EIGHT_HOURS
+    ONE_WEEK
+    ALWAYS
+}
+
+model chat_users {
+    id              Int            @id @default(autoincrement())
+    chat_id         Int
+    user_id         String
+    is_admin        Boolean        @default(false)
+    last_message_id Int?
+    is_muted        Boolean        @default(false)
+    mute_duration   Mute_duration  @default(EIGHT_HOURS)
+    muted_at        DateTime?
+    is_left         Boolean        @default(false)
+    is_deleted      Boolean        @default(false)
+    created_at      DateTime       @default(now()) @db.Timestamp(0)
+    updated_at      DateTime       @updatedAt
+    chats           chats          @relation(fields: [chat_id], references: [id], onDelete: Cascade)
+    users           users          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+    chat_messages   chat_messages? @relation(fields: [last_message_id], references: [id], onDelete: Cascade)
+}
+
+model chat_messages {
+    id                   Int                    @id @default(autoincrement())
+    chat_id              Int
+    sender_id            String
+    message_text         String?
+    attachment_url       String?
+    created_at           DateTime               @default(now()) @db.Timestamp(0)
+    updated_at           DateTime               @updatedAt
+    chats                chats                  @relation(fields: [chat_id], references: [id], onDelete: Cascade)
+    users                users                  @relation(fields: [sender_id], references: [id], onDelete: Cascade)
+    chat_users           chat_users[]
+    chat_message_details chat_message_details[]
+}
+
+model chat_message_details {
+    id            Int           @id @default(autoincrement())
+    chat_id       Int
+    message_id    Int
+    recipient_id  String
+    is_delivered  Boolean       @default(false)
+    is_read       Boolean       @default(false)
+    delivered_at  DateTime?
+    read_at       DateTime?
+    created_at    DateTime      @default(now()) @db.Timestamp(0)
+    updated_at    DateTime      @updatedAt
+    chats         chats         @relation(fields: [chat_id], references: [id], onDelete: Cascade)
+    chat_messages chat_messages @relation(fields: [message_id], references: [id], onDelete: Cascade)
+    users         users         @relation(fields: [recipient_id], references: [id], onDelete: Cascade)
+}

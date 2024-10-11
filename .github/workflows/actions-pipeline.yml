@@ -1,0 +1,65 @@
+name: Sample Backend Pipeline
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  build-and-deploy:
+    runs-on: self-hosted
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 20.14.0
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20.14.0
+
+      - name: Installing dependencies
+        run: npm install
+
+      - name: Set up environment variables
+        env:
+          ACCESS_KEY_ID: ${{ secrets.ACCESS_KEY_ID }}
+          SECRET_ACCESS_KEY: ${{ secrets.SECRET_ACCESS_KEY }}
+          BUCKET_NAME: ${{ vars.BUCKET_NAME }}
+          BUCKET_REGION: ${{ vars.BUCKET_REGION }}
+          DATABASE_URL: ${{ vars.DATABASE_URL }}
+          PORT: ${{ vars.PORT }}
+          S3_ACCESS_URL: ${{ vars.S3_ACCESS_URL }}
+          JWT_SECRET_KEY: ${{ vars.JWT_SECRET_KEY }}
+
+        run: |
+          echo "ACCESS_KEY_ID=$ACCESS_KEY_ID" >> $GITHUB_ENV
+          echo "SECRET_ACCESS_KEY=$SECRET_ACCESS_KEY" >> $GITHUB_ENV
+          echo "BUCKET_NAME=$BUCKET_NAME" >> $GITHUB_ENV
+          echo "BUCKET_REGION=$BUCKET_REGION" >> $GITHUB_ENV
+          echo "DATABASE_URL=$DATABASE_URL" >> $GITHUB_ENV
+          echo "PORT=$PORT" >> $GITHUB_ENV
+          echo "S3_ACCESS_URL=$S3_ACCESS_URL" >> $GITHUB_ENV
+          echo "JWT_SECRET_KEY=$JWT_SECRET_KEY" >> $GITHUB_ENV
+
+      - name: Generate Prisma
+        run: npx prisma generate
+
+      - name: Database Migrations
+        run: npx prisma migrate deploy --preview-feature
+
+      - name: Stop previous PM2 instance (if running)
+        run: |
+          npx pm2 stop sample-backend || true
+          npx pm2 delete sample-backend || true
+        continue-on-error: true
+
+      - name: Starting Application with PM2
+        id: start_pm2
+        run: |
+          npx pm2 start server.js --name "sample-backend" -f
+        continue-on-error: true
+
+      - name: Print IP if application started successfully
+        if: ${{ steps.start_pm2.outcome == 'success' }}
+        run: |
+          RUNNER_IP=$(curl -s http://checkip.amazonaws.com)
+          echo "App is running on IP address: $RUNNER_IP:8086"
