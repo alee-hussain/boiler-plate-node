@@ -27,7 +27,7 @@ const handle_multer_error = (err) => {
 };
 
 const handle_multipart_data =
-  (type = "CREATE") =>
+  (type = "REQUIRED") =>
   (req, res, next) => {
     const upload = multer({
       storage,
@@ -35,7 +35,7 @@ const handle_multipart_data =
     }).fields(fields);
 
     upload(req, res, (err) => {
-      if (!Object.keys(req.files).length && type !== "UPDATE") {
+      if (!Object.keys(req.files).length && type !== "NOT_REQUIRED") {
         const response = bad_request_response("No file to upload.");
         return res.status(response.status.code).json(response);
       }

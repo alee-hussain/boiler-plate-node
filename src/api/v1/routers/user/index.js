@@ -7,7 +7,8 @@ const verify_token = require("@v1_middlewares/verify_token");
 const handle_multipart_data = require("@v1_middlewares/populate_multipart_data.middleware");
 const upload_image = require("@v1_middlewares/upload_picture.middleware");
 const UserSchema = require("@v1_validations/user");
-const UserController = require("@v1_controllers/user/user.controller");
+const UserController = require("@api/v1/controllers/user");
+
 const user_validation_schema = new UserSchema();
 const user_controller = new UserController();
 

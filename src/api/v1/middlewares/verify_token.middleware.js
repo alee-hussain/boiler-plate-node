@@ -5,7 +5,7 @@ const {
   session_expired_response,
 } = require("@constants/responses");
 const { prisma } = require("@configs/prisma");
-const TokenService = require("@v1_services/token_service");
+const TokenService = require("@api/v1/services/token");
 
 const token_service = new TokenService(process.env.JWT_SECRET_KEY);
 

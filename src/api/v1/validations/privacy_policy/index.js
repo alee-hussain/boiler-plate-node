@@ -2,8 +2,8 @@
 
 const Joi = require("joi");
 
-class TermsAndConditionSchema {
-  create_terms_and_condition_schema = Joi.object({
+class PrivacyPolicySchema {
+  create_privacy_policy_schema = Joi.object({
     query: Joi.object({}),
     params: Joi.object({}),
     body: Joi.object({
@@ -12,4 +12,4 @@ class TermsAndConditionSchema {
   });
 }
 
-module.exports = TermsAndConditionSchema;
+module.exports = PrivacyPolicySchema;

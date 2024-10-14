@@ -1,15 +1,80 @@
 /** @format */
 
-const {
-  bad_request_response,
-  forbidden_response,
-  not_found_response,
-} = require("@constants/responses");
+const jwt = require("jsonwebtoken");
+
 const { prisma } = require("@configs/prisma");
-const TokenService = require("@v1_services/token_service");
+const TokenService = require("@api/v1/services/token");
+const Responses = require("@constants/responses");
+
+const responses = new Responses();
 const token_service = new TokenService(process.env.JWT_SECRET_KEY);
 
 class UserService {
+  //Generate OTP
+  #generate_random_numeric_code = ({ length }) => {
+    let otp = "";
+    for (let i = 0; i < length; i++) {
+      otp += Math.floor(Math.random() * 10); // Generates a random digit (0-9)
+    }
+    return otp;
+  };
+
+  //Facebook Login
+  #verify_facebook_token = async ({ token }) => {
+    try {
+      const response = await axios.get(
+        `https://graph.facebook.com/me?access_token=${token}`
+      );
+      const { name, id } = response.data;
+      return { user_name: name, password: id };
+    } catch (error) {
+      throw responses.server_error_response("Error verifying facebook token");
+    }
+  };
+
+  //Apple Login
+  #verify_apple_token = async ({ token }) => {
+    try {
+      const { header, payload } = jwt.decode(token, { complete: true });
+
+      if (
+        header.alg !== "RS256" ||
+        payload.iss !== "https://appleid.apple.com" ||
+        payload.aud !== "com.your.app.bundleId" ||
+        Date.now() >= payload.exp * 1000
+      ) {
+        throw responses.bad_request_response("Invalid Apple token");
+      }
+      return {
+        email: payload.email || "",
+        user_name: payload?.user_name || "",
+        profile_picture: payload?.profile_picture || "",
+      };
+    } catch (error) {
+      throw responses.server_error_response("Error verifying Apple token");
+    }
+  };
+
+  // Verify Google Token
+  #verify_google_token = async ({ token }) => {
+    try {
+      const ticket = await client.verifyIdToken({
+        idToken: token,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
+      const payload = ticket.getPayload();
+      const { sub, email, picture, name } = payload;
+      return {
+        email,
+        profile_picture: picture,
+        user_name: name,
+      };
+    } catch (error) {
+      console.log(error);
+      throw responses.server_error_response("Error verifying Google token");
+    }
+  };
+
   // Validate Identifier
   #validate_identifier = (identifier) => {
     const phone_regex = /^\+?1?\s?(\(?\d{3}\)?[\s.-]?)\d{3}[\s.-]?\d{4}$/;
@@ -50,7 +115,7 @@ class UserService {
       user.id,
       user.user_type
     );
-    const refresh_token = token_service.genarate_refresh_token(
+    const refresh_token = token_service.generate_refresh_token(
       user.id,
       user.user_type
     );
@@ -109,13 +174,13 @@ class UserService {
 
     //if user is already registered
     if (already_user && already_user[`is_${identifier_type}_verified`]) {
-      throw bad_request_response(
+      throw responses.bad_request_response(
         `${identifier_type} ${identifier} already associated with another account`
       );
     }
 
     //data for new user
-    const otp = generate_random_numeric_code(6); //otp
+    const otp = this.#generate_random_numeric_code({ length: 6 }); //otp
     const _exp = new Date(new Date().getTime() + 60 * 1000).toISOString(); // expires-in
     const data = {
       user_name,
@@ -159,11 +224,11 @@ class UserService {
       !already_user ||
       (!already_user.is_email_verified && !already_user.is_phone_verified)
     ) {
-      throw bad_request_response(`User not found`);
+      throw responses.bad_request_response(`User not found`);
     }
 
     if (already_user.user_secrets.password !== password) {
-      throw bad_request_response(`Invalid credentials`);
+      throw responses.bad_request_response(`Invalid credentials`);
     }
 
     const { access_token, refresh_token } = await this.#create_user_session({
@@ -187,7 +252,9 @@ class UserService {
     });
 
     if (!already_user) {
-      throw bad_request_response(`Invalid ${identifier_type} provided.`);
+      throw responses.bad_request_response(
+        `Invalid ${identifier_type} provided.`
+      );
     }
 
     //matching otp and expirtion time
@@ -206,7 +273,7 @@ class UserService {
         data,
       });
     } else {
-      throw bad_request_response("Invalid or Expired OTP.");
+      throw responses.bad_request_response("Invalid or Expired OTP.");
     }
 
     const { access_token, refresh_token } = await this.#create_user_session({
@@ -230,11 +297,11 @@ class UserService {
       identifier_type,
     });
     if (!already_user) {
-      throw not_found_response("User not found.");
+      throw responses.not_found_response("User not found.");
     }
 
     //updating user secrets
-    const otp = generate_random_numeric_code(6);
+    const otp = this.#generate_random_numeric_code({ length: 6 });
     const _exp = new Date(new Date().getTime() + 60 * 1000).toISOString();
     await this.#update_user_secret({
       _exp,
@@ -245,14 +312,14 @@ class UserService {
 
   //Reset Password
   reset_password = async ({ user, password }) => {
-    const already_user = await this.get_already_user({
+    const already_user = await this.#get_already_user({
       find_user_obj: { id: user.id },
     });
     if (!already_user) {
-      throw not_found_response("User not found.");
+      throw responses.not_found_response("User not found.");
     }
 
-    await this.update_user_secret({
+    await this.#update_user_secret({
       password,
       id: already_user.user_secrets.id,
     });
@@ -260,19 +327,19 @@ class UserService {
 
   //Change Password
   change_password = async ({ user, password, old_password }) => {
-    const already_user = await this.get_already_user({
+    const already_user = await this.#get_already_user({
       find_user_obj: { id: user.id },
     });
     if (!already_user) {
-      throw not_found_response("User not found.");
+      throw responses.not_found_response("User not found.");
     }
 
     //matching password
     if (already_user.user_secrets.password !== old_password) {
-      throw bad_request_response("Old password is incorrect.");
+      throw responses.bad_request_response("Old password is incorrect.");
     }
 
-    await this.update_user_secret({
+    await this.#update_user_secret({
       password,
       id: already_user.user_secrets.id,
     });
@@ -287,11 +354,11 @@ class UserService {
     });
 
     if (!already_user) {
-      throw not_found_response("User not found.");
+      throw responses.not_found_response("User not found.");
     }
 
     //update otp and expiration time
-    const otp = generate_random_numeric_code(6);
+    const otp = this.#generate_random_numeric_code({ length: 6 });
     const _exp = new Date(new Date().getTime() + 60 * 1000).toISOString();
     await this.#update_user_secret({
       otp,
@@ -306,8 +373,8 @@ class UserService {
   social_login = async ({ token, fcm_token, user_type, social_type }) => {
     const { email, profile_picture, user_name } =
       social_type == "GOOGLE"
-        ? await verify_google_token(token)
-        : await verify_apple_token(token);
+        ? await this.#verify_google_token({ token })
+        : await this.#verify_apple_token({ token });
 
     const already_user = await this.#get_already_user({
       find_user_obj: { email, is_email_verified: true },
@@ -362,7 +429,7 @@ class UserService {
       id: user.id,
     });
     if (!db_user) {
-      throw bad_request_response("User not found");
+      throw responses.bad_request_response("User not found");
     }
     return db_user;
   };
@@ -384,7 +451,7 @@ class UserService {
       },
     });
     if (!user_session.count) {
-      return res.status(response.status.code).json(response);
+      throw responses.bad_request_response("Invalid refresh token");
     }
   };
 
@@ -392,7 +459,7 @@ class UserService {
   refresh_user = async ({ refresh_token }) => {
     const access_token = token_service.refresh_token(refresh_token);
     if (!access_token) {
-      throw forbidden_response("Invalid Refresh Token.");
+      throw responses.bad_request_response("Invalid refresh token.");
     }
     return { access_token };
   };
@@ -409,7 +476,7 @@ class UserService {
     });
 
     if (!db_user) {
-      throw not_found_response("User not Valid.");
+      throw responses.not_found_response("User not Valid.");
     }
   };
 
@@ -417,7 +484,7 @@ class UserService {
   edit_user_profile = async ({ id, data }) => {
     const db_user = await this.#get_already_user({ find_user_obj: { id } });
     if (!db_user.user_details.id) {
-      throw bad_request_response("Unable to update");
+      throw responses.bad_request_response("Unable to update");
     }
     await this.#update_user_details({ data, id: db_user.user_details.id });
   };
@@ -426,7 +493,7 @@ class UserService {
   update_profile_picture = async ({ id, data }) => {
     const db_user = await this.#get_already_user({ find_user_obj: { id } });
     if (!db_user.user_details.id) {
-      throw bad_request_response("Unable to update");
+      throw responses.bad_request_response("Unable to update");
     }
     await this.#update_user_details({ data, id: db_user.user_details.id });
   };
@@ -434,7 +501,7 @@ class UserService {
   //Create User Profile
   create_user_profile = async ({ user, data }) => {
     if (user.is_completed) {
-      throw bad_request_response("Profile already created.");
+      throw responses.bad_request_response("Profile already created.");
     }
     await prisma.$transaction(async (tx) => {
       await tx.users.update({

@@ -1,25 +1,26 @@
 /** @format */
 
 const express = require("express");
+
 const verify_token = require("@v1_middlewares/verify_token.middleware");
 const validate_request = require("@v1_middlewares/validate_request_joi.middleware");
-const {
-  create_terms_and_condition_schema,
-} = require("@v1_validations/terms_and_conditions");
-const {
-  create_privacy_policy,
-  get_privacy_policy,
-} = require("@v1_controllers/privacy_policy/privacy_policy.controller");
+const user_type_check = require("@api/v1/middlewares/user_type_check.middleware");
+const PrivacyPolicyController = require("@api/v1/controllers/privacy_policy");
+const PrivacyPolicySchema = require("@api/v1/validations/privacy_policy");
+
+const privacy_policy_controller = new PrivacyPolicyController();
+const privacy_policy_schema = new PrivacyPolicySchema();
 
 const router = express.Router();
 
 router.post(
   "/",
   verify_token,
-  validate_request(create_terms_and_condition_schema),
-  create_privacy_policy
+  user_type_check("ADMIN"),
+  validate_request(privacy_policy_schema.create_privacy_policy_schema),
+  privacy_policy_controller.create_privacy_policy
 );
 
-router.get("/", get_privacy_policy);
+router.get("/", privacy_policy_controller.create_privacy_policy);
 
 module.exports = router;

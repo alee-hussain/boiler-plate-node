@@ -4,12 +4,12 @@ const env = require("dotenv");
 const path = require("path");
 const app = require("./app");
 env.config();
-const connectSocket = require("@configs/socket");
+const connect_socket = require("@configs/socket");
 const { logger } = require("@configs/logger");
 
-const httpServer = require("http").createServer(app);
-connectSocket(httpServer);
+const http_server = require("http").createServer(app);
+connect_socket(http_server);
 
-httpServer.listen(process.env.PORT, () => {
+http_server.listen(process.env.PORT, () => {
   logger.info(`listening on http://localhost:${process.env.PORT}`);
 });

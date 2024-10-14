@@ -1,6 +1,6 @@
 const socket = require("socket.io");
 
-const connectSocket = (httpServer) => {
+const connect_socket = (httpServer) => {
   const io = socket(httpServer, {
     cors: {
       origin: "*",
@@ -8,4 +8,4 @@ const connectSocket = (httpServer) => {
   });
 };
 
-module.exports = connectSocket;
+module.exports = connect_socket;

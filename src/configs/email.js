@@ -1,4 +1,7 @@
+const Responses = require("@constants/responses");
 const nodemailer = require("nodemailer");
+
+const responses = new Responses();
 
 // create reusable transporter object using the default SMTP transport
 const transporter = nodemailer.createTransport({
@@ -12,13 +15,13 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-const sendEmail = async (mailDetails) => {
+const send_email = async (mail_details) => {
   try {
-    const info = await transporter.sendMail(mailDetails);
+    const info = await transporter.sendMail(mail_details);
     return info;
   } catch (error) {
-    console.log(error);
+    throw responses.server_error_response(error.message);
   }
 };
 
-module.exports = sendEmail;
+module.exports = send_email;
