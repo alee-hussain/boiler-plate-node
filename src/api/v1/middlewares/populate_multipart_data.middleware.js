@@ -1,7 +1,8 @@
 /** @format */
 
+const Responses = require("@constants/responses");
 const multer = require("multer");
-const { bad_request_response } = require("@constants/responses");
+const responses = new Responses();
 
 const storage = multer.memoryStorage();
 const limits = { fileSize: 10 * 1024 * 1024 }; // Allow up to 10 MB per file
@@ -26,28 +27,28 @@ const handle_multer_error = (err) => {
   }
 };
 
-const handle_multipart_data =
-  (type = "REQUIRED") =>
-  (req, res, next) => {
-    const upload = multer({
-      storage,
-      limits,
-    }).fields(fields);
+const handle_multipart_data = function (req, res, next) {
+  const type = this;
+  const upload = multer({
+    storage,
+    limits,
+  }).fields(fields);
 
-    upload(req, res, (err) => {
-      if (!Object.keys(req.files).length && type !== "NOT_REQUIRED") {
-        const response = bad_request_response("No file to upload.");
-        return res.status(response.status.code).json(response);
-      }
+  upload(req, res, (err) => {
+    if (!Object.keys(req.files).length && type !== "NOT_REQUIRED") {
+      const response = responses.bad_request_response("No file to upload.");
+      return res.status(response.status.code).json(response);
+    }
 
-      const error = handle_multer_error(err);
+    const error = handle_multer_error(err);
 
-      if (error) {
-        const response = bad_request_response(error);
-        return res.status(response.status.code).json(response);
-      }
+    if (error) {
+      const response = responses.bad_request_response(error);
+      return res.status(response.status.code).json(response);
+    }
 
-      next();
-    });
-  };
+    next();
+  });
+};
+
 module.exports = handle_multipart_data;

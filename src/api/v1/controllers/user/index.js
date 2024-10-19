@@ -9,10 +9,10 @@ const user_service = new UserService();
 class UserController {
   register_user = async (req, res, next) => {
     try {
-      const { indentifier, user_name, password, user_type } = req.body;
+      const { identifier, user_name, password, user_type } = req.body;
 
-      const { otp, user } = user_service.register_user({
-        indentifier,
+      const { otp, user } = await user_service.register_user({
+        identifier,
         user_name,
         password,
         user_type,
@@ -30,10 +30,10 @@ class UserController {
 
   login_user = async (req, res, next) => {
     try {
-      const { indentifier, password, fcm_token } = req.body;
+      const { identifier, password, fcm_token } = req.body;
 
       const { access_token, refresh_token, is_profile_completed } =
-        user_service.login_user({ indentifier, password, fcm_token });
+        await user_service.login_user({ identifier, password, fcm_token });
 
       const response = responses.ok_response(
         {
@@ -51,10 +51,10 @@ class UserController {
 
   verify_otp = async (req, res, next) => {
     try {
-      const { otp, indentifier, fcm_token } = req.body;
+      const { otp, identifier, fcm_token } = req.body;
 
       const { access_token, refresh_token, is_profile_completed } =
-        user_service.verify_otp({ otp, indentifier, fcm_token });
+        await user_service.verify_otp({ otp, identifier, fcm_token });
 
       const response = responses.ok_response(
         { access_token, refresh_token, is_profile_completed },
@@ -70,7 +70,7 @@ class UserController {
     try {
       const { identifier } = req.body;
 
-      const { otp, user } = user_service.forget_password({
+      const { otp, user } = await user_service.forget_password({
         identifier,
       });
 
@@ -139,7 +139,12 @@ class UserController {
       const { token, fcm_token, user_type, social_type } = req.body;
 
       const { access_token, refresh_token, is_profile_completed } =
-        user_service.social_login({ token, fcm_token, user_type, social_type });
+        await user_service.social_login({
+          token,
+          fcm_token,
+          user_type,
+          social_type,
+        });
 
       const response = responses.ok_response(
         {
@@ -266,7 +271,7 @@ class UserController {
 
       await user_service.update_profile_picture({
         id: user.id,
-        data: { profile_picture: req.images.profile_picture[0] },
+        data: { profile_picture: req.images.profile_picture[0].path },
       });
 
       const response = responses.ok_response(
@@ -281,7 +286,7 @@ class UserController {
 
   create_profile = async (req, res, next) => {
     try {
-      req.body.profile_picture = req.images.profile_picture[0];
+      req.body.profile_picture = req.images.profile_picture[0].path;
       const { user } = req.user;
 
       await user_service.create_user_profile({ user, data: req.body });

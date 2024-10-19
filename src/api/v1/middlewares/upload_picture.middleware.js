@@ -8,12 +8,24 @@ const process_files = async (files, date) => {
 };
 
 const extract_urls_and_field_name = (responses) => {
-  const urls = responses.map((response) => ({
-    path: process.env.S3_ACCESS_URL + response.public_id,
-    content_type: response.content_type,
-  }));
-  const fieldname = responses[0].public_id.split("/")[1];
-  return { urls, fieldname };
+  const images = {};
+  responses.map((response) => {
+    const fieldname = response.public_id.split("/")[1];
+    if (!images[fieldname]) {
+      images[fieldname] = [
+        {
+          path: process.env.S3_ACCESS_URL + response.public_id,
+          content_type: response.content_type,
+        },
+      ];
+    } else {
+      images[fieldname].push({
+        path: process.env.S3_ACCESS_URL + response.public_id,
+        content_type: response.content_type,
+      });
+    }
+  });
+  return images;
 };
 
 const upload_image = async (req, res, next) => {
@@ -31,10 +43,9 @@ const upload_image = async (req, res, next) => {
 
     // Flatten the responses array
     const flattened_responses = [].concat(...responses);
-    const { urls, fieldname } =
-      extract_urls_and_field_name(flattened_responses);
+    const images = extract_urls_and_field_name(flattened_responses);
 
-    req.images[fieldname] = urls;
+    req.images = images;
   } catch (error) {
     return next(error); // Handle errors from uploading
   }

@@ -6,7 +6,7 @@ const create_chat_schema = Joi.object({
   query: Joi.object({}),
   params: Joi.object({}),
   body: Joi.object({
-    recipient_id: Joi.string().required(),
+    recipient_ids: Joi.array().required(),
   }),
 });
 

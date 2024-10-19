@@ -5,6 +5,7 @@ const jwt = require("jsonwebtoken");
 const { prisma } = require("@configs/prisma");
 const TokenService = require("@api/v1/services/token");
 const Responses = require("@constants/responses");
+const send_message_to_queue = require("@api/v1/helpers/send_message_queue");
 
 const responses = new Responses();
 const token_service = new TokenService(process.env.JWT_SECRET_KEY);
@@ -79,12 +80,13 @@ class UserService {
   #validate_identifier = (identifier) => {
     const phone_regex = /^\+?1?\s?(\(?\d{3}\)?[\s.-]?)\d{3}[\s.-]?\d{4}$/;
     const email_regex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
     if (phone_regex.test(identifier)) {
       return "phone";
     } else if (email_regex.test(identifier)) {
       return "email";
     } else {
-      return "user_name";
+      throw new Error("invalid identifier"); // Simplified for debugging
     }
   };
 
@@ -159,6 +161,7 @@ class UserService {
       where: find_user_obj || find_user_where,
       include: {
         user_secrets: true,
+        user_details: true,
       },
     });
   };
@@ -183,7 +186,6 @@ class UserService {
     const otp = this.#generate_random_numeric_code({ length: 6 }); //otp
     const _exp = new Date(new Date().getTime() + 60 * 1000).toISOString(); // expires-in
     const data = {
-      user_name,
       user_type,
       user_secrets: {
         create: {
@@ -197,10 +199,10 @@ class UserService {
 
     if (!already_user) {
       //create a new user
-      user = await prisma.users.create({
+      const user = await prisma.users.create({
         data,
       });
-      return { opt, user };
+      return { otp, user };
     } else {
       //updating with new otp and expiration time
       await this.#update_user_secret({
@@ -208,7 +210,7 @@ class UserService {
         _exp,
         id: already_user.user_secrets.id,
       });
-      return { opt, user: already_user };
+      return { otp, user: already_user };
     }
   };
 
@@ -246,7 +248,8 @@ class UserService {
   //Verify OTP
   verify_otp = async ({ otp, identifier, fcm_token }) => {
     const identifier_type = this.#validate_identifier(identifier);
-    const already_user = this.#get_already_user({
+
+    const already_user = await this.#get_already_user({
       identifier,
       identifier_type,
     });
@@ -487,6 +490,10 @@ class UserService {
       throw responses.bad_request_response("Unable to update");
     }
     await this.#update_user_details({ data, id: db_user.user_details.id });
+    await send_message_to_queue({
+      app_user_id: id,
+      user_name: data.first_name,
+    });
   };
 
   //Update Profile Picture
@@ -495,6 +502,11 @@ class UserService {
     if (!db_user.user_details.id) {
       throw responses.bad_request_response("Unable to update");
     }
+    await send_message_to_queue({
+      app_user_id: id,
+      profile_picture: data.profile_picture,
+    });
+
     await this.#update_user_details({ data, id: db_user.user_details.id });
   };
 
@@ -503,6 +515,8 @@ class UserService {
     if (user.is_completed) {
       throw responses.bad_request_response("Profile already created.");
     }
+
+    //update user and add details
     await prisma.$transaction(async (tx) => {
       await tx.users.update({
         where: {
@@ -517,6 +531,13 @@ class UserService {
           date_of_birth: new Date(data.date_of_birth),
         },
       });
+    });
+
+    //send message queue to chat microservices
+    await send_message_to_queue({
+      profile_picture: data.profile_picture,
+      user_name: data.first_name,
+      app_user_id: user.id,
     });
   };
 

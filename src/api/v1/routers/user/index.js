@@ -3,7 +3,7 @@
 const express = require("express");
 const user_type_check = require("@v1_middlewares/user_type_check.middleware");
 const validate_request = require("@v1_middlewares/validate_request_joi.middleware");
-const verify_token = require("@v1_middlewares/verify_token");
+const verify_token = require("@v1_middlewares/verify_token.middleware");
 const handle_multipart_data = require("@v1_middlewares/populate_multipart_data.middleware");
 const upload_image = require("@v1_middlewares/upload_picture.middleware");
 const UserSchema = require("@v1_validations/user");
@@ -113,7 +113,7 @@ router.post(
   "/create_profile",
   verify_token,
   user_type_check("USER"),
-  handle_multipart_data,
+  handle_multipart_data.bind("REQUIRED"),
   upload_image,
   validate_request(user_validation_schema.create_user_profile_schema),
   user_controller.create_profile

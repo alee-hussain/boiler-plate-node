@@ -1,5 +1,7 @@
 const { logger } = require("@configs/logger");
-const { badRequestResponse } = require("@constants/responses");
+const Responses = require("@constants/responses");
+
+const responses = new Responses();
 
 const validate_request = (schema) => (req, res, next) => {
   const { body, params, query } = req;
@@ -11,7 +13,7 @@ const validate_request = (schema) => (req, res, next) => {
     );
     if (error) {
       const errorMessage = error.details.map((err) => err.message);
-      const response = badRequestResponse(errorMessage);
+      const response = responses.bad_request_response(errorMessage);
       return res.status(response.status.code).json(response);
     }
     next();
